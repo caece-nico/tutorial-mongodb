@@ -40,9 +40,49 @@ pip install python-dotenv
 
 ## Instalacion CLI
 
+__VER TUTORIAL DE ETL CON PYSPARK__
+
 Por defecto el puerto de la instalacion de MongoDB es mongodb://localhost:27017
 
 ## Instalacion Atlas
+
+```
+Atlas es la version gratuita en la Nube de MongoDB donde podemos crear un BD. 
+```
+
+1. Despues de logearnos con Google seleccionamos el __plan gratis__
+
+2. Elegimos un tipo de cluster (__shared__) y region que sea gratuita y que no tenga el signo __$__
+
+![atlas-create-cluster](./img/atlas-create-cluster.png)
+
+3. Creamos un nombre para el __cluster__ mas __nombre de usuario__ y __password__
+
+![atlas-create-user-name](./img/atles-create-username.png)
+
+4. Una vez creado el usuarioname/password debemos indicar que nos vamos a conectar desde nuestro __entorno local__
+
+![atlas-entorno-local](./img/atlas-entorno-local.png)
+
+5. Debido a que nos vamos a conectar desde nuestra pc a la nube especificamos las __ips__ __Add my current IP Address__
+
+![atlas-ip-addresses](./img/atlas-ip-addresses.png)
+
+
+```
+Con esto ya tenemos creado el CLUSTER, lo cual es nada mas que una abstraccion por encima de la BD que la contiene.
+```
+
+![atlas-cluster](./img/atlas-cluster.png)
+
+Acá nos indica que nuestro cluster está confirmado por __3 replicas__ basicamente quiere decir que nuestra BD vive en tres lugares en simultaneo, esto probee alta escalabilidad y redundancia.
+
+6. Desde __connect__ podemos ver un ejemplo para conectarnos a la base usando __python__ o __compass__
+
+![atlas-connect-python](./img/atlas-connect-python.png)
+
+Aunque tambien podemos conectarnos desde __mongoCLI__ __mongoSHELL__ o __compass__
+
 
 ## Loging a mongodb
 
