@@ -13,7 +13,16 @@
     - [Delete](#.-delete)
 3. [Relaciones en MongoDB](#3.-relaciones-en-mongodb)
     - [Embedings](#.-embedings)
-    - [Foreign Keys](#.-foreign-keys)
+    - [Foreign Keys](#.-foreign-key)
+4. [Data Modeling](#4.-data-modeling)
+    - [Schema Validation](#.-schema-validation)
+    - [One-to-One](#.-one-to-one)
+    - [One-to-Many](#.-one-to-many)
+5. [Advance Querys](#5.-advance-querys)
+    - [Regular Expression](#.-regular-expression)
+    - [Joins](#.-joins)
+    - [Count](#.-count)
+    - [Restricciones](#.-restricciones)
 
 
 # 1. Instalacion MongoDB
@@ -563,3 +572,289 @@ En este ejemplo pasamos un diccionario con el JSON que queremos vincular al docu
 Para esto, notar que hacemos un hardcopy de __address__ para no modificar el valor de la variable.
 Luego creamos la coleccion __address__, la misma se crea de forma automatica porque no existe.
 Y a la variable __address__ le pasamos tambien el __id__ que queremos vincular.
+
+# 4. Data Modeling
+
+```
+Para esta parte vamos a desarrollar un modelo de datos donde tendremos dos colecciones. Una de LIbros y otra de Autores, la idea es poder ver la cantidad de libros de cada Autor e implementar nuevas funciones.
+Tambien usar la Validacion de esquema para crear una relacion de integridad mas fuerte al momento de insertar nuevos documentos.
+```
+
+## Schema Validation
+
+Es una forma de crear una forma de estructura dentro la coleccion.
+Nos permite definir tipo de datos, keys y si es obligatorio o no.
+
+Existe fos formas de crear la validacion en las colecciones.
+Una es al momento de crear la coleccion.
+
+```python
+ db.createCollection("autores", {
+    validator:{
+        "$jsonSchema":{
+            "bsonType": "object",
+            "required": ["name", "year", "major", "address"],
+            "properties": {
+                "name": {
+                    "bsonType": "string",
+                    "description": "must be a string and is required"
+                },
+                "year": {
+                    "bsonType": "int",
+                    "minimun": 2017,
+                    "maximun": 3017,
+                    "description": "must be an integer in [2017, 3017] and is required"
+                },
+                "major": {
+                    "enum": ["math", "English", "Computer Sciences", "History", null],
+                    "description": "can only be one of the enum values and is required"
+                },
+                "gpa": {
+                    "bsonType": ["double"],
+                    "description": "must be a double is the field exists"
+                },
+                "address":{
+                    "bsonType": "object",
+                    "required": ["city"],
+                    "properties":{
+                        "street":{
+                            "bsonType": "string",
+                            "description": "must be an integer if the field exists"
+                        },
+                        "city":{
+                            "bsonType": "string",
+                            "description": "must be string if the field exists"
+                        }
+                    }
+                }
+
+            }
+        }
+        }
+    }
+)
+```
+
+En este ejemplo todos los campos que estan especificados en __required__ son obligatorios, pero __gpa__ y __address__ no están, entonces son optativos, pero en caso de ser enviados __address__ tiene un formato definido.
+
+
+Otra forma es primero crear el esquema en formato __json__ y luego se lo agregamos a una collection existente.
+
++ Ejemplo de __book validator__
+
+
+```python
+book_validator = {
+    "$jsonSchema":{
+        "bsonType":"object",
+        "required":["title", "authors", "publish_date", "type", "copies"],
+        "properties":{
+            "title":{
+                "bsonType": "string",
+                "description": "must be a string and is required"
+            },
+            "authors":{
+                "bsonType": "array",
+                "items": {
+                    "bsonType": "objectId",
+                    "description": "must be an objectId and is required"
+                }
+            },
+            "published_date": {
+                "bsonType": "date",
+                "description": "must be a date and is required"
+            },
+            "type": {
+                "enum": ["Fiction", "Non-Fiction"],
+                "description": "can only be one of the enum values and its required"
+            },
+            "copies": {
+                "bsonType": "int",
+                "minimum": 0,
+                "description": "should be greather than 0 and is required"
+            }
+
+        }
+    }
+}
+```
+
+En este ejemplo __authors__ es del tipo __array__ asique los tipos de sus componentes deben ser especificados.
+El campo Type, es un __enum__ asique se le indican los valores posibles.
+
+
+Creamos una coleccion y le __agregamos el validador__.
+
+```python
+try:
+    miDB.createCollection("Book")
+except Exception as e:
+    print(e)
+
+miDB.command("collMod", "Book", validator=book_validator)
+```
+
+## One-to-One
+
+Cuando tenemos una relacion que sabemos que es __one-to-one__ por ejemplo una dirección  que solo está asociada con una persona está bien usar __embeding__ 
+Pero si tenemos una direccion que es compartida con mas de una persona y la misma puede ser modificada, es un gran consumo de recursos de almacenamiento y de mantenimiento. Ya que si la direccion tuviera una modificacion deberia ser modificada en N documentos.
+
+Tambien podemos tener un __documento__ con mucha informacion que es __time consuming__ y quizás no siempre es necesaria. Para estos casos existe un enfoque llamado __subseting__ que permite seprar en colecciones lo que mas cosultados de lo que es consultado de forma infrecuent, generando una relacion del tipo __foreign key__
+
+Un problema con este ultimo enfoque es que puede generar mas __joins__ de los que quisieramos.
+
+## One-to-Many
+
+Cuando tenemos este escenario es parecido a lo que deciamos antes, donde se repite mucho un dato o propiedad pero ocmo beneficio no tenemos que hacer muchos __join__.
+
+Cuando tenemos un caso de __One-to-Many__ se intenta crear una relacion de __foreign Keys__ donde se divide una coleccion en dos o mas relacionadas por una __FK__
+
+Tambien el enfoque de __subset__ es valido.
+
+
+# 5. Advance Querys
+
+## Regular Expression
+
+1. Queremos obtener todos los libros que tienen la letra __A__
+
+
+```python
+books_containing_a = books_collection.find({"title":{"$regex":"a{1}"}})
+```
+
+Esta expresion indica que queremos bsucar lo que tenga al menos una A.
+
+## Joins
+
+Usamos __JOINS__ para unir dos o mas collections. Por ejemplo.
+
+2. Queres vincular los autores con todos los libros que escribieron.
+
+```
+Para esto vamos a usar .aggregate que permite pasar un pipeline para encadenar acciones.
+El JOINS lo usamos haciendo $lookup (left join).
+```
+
+```python
+authors_and_books = author_collection.aggregate([{
+    "$lookup":{
+        "from": "book",
+        "localField": "_id",
+        "foreignField": "authors",
+        "as": "books"
+    }
+}])
+```
+
+__from__ indica la otra coleccion contra la que queremos hacer el __left join__
+__localField__ es el campo de la tabla de la izquiera para hacer el cruce
+__foreignField__ es el campo de la tabla de la derecha
+
+## Count
+
+3. Queres encontrar la cantidad de libros que escribió cada Autor.
+
+Para lograr esto el __pipeline__ primero debe vincular el autor con todos sus libros. #Lo hicimos en el punto dos#
+
+
+Luego agregamos un nuevo campo __total_books__, para agregar este nuevo campo usamos el array __books__ que creamos en el __pipeline__ anterior.
+
+```python
+count_authors_and_books = authors_collecton.aggregate(
+    [ # lista
+    { # primer pipeline left-join
+        "$lookup":{
+            "from": "Book",
+            "localField": "_id",
+            "foreignField": "authors",
+            "as": "books"
+        }
+    },
+    { # segundo pipeline - count
+        "$addFields":{
+            "total_libros":{"$size":"$books"}
+        }
+    },
+    { # tercer pipeline - muestra
+        "$project":{
+            "first_name":1, "last_name":1, "total_libros":1, "_id":0
+        }
+    }
+])
+```
+
+__IMPORTANTE__ notar que en el segundo pipeline llamamos a la funcion __$size__ sobre lo que generamos en el __pipeline anterior__ __"as":"books"__
+sobre ese array hacemos __$size__
+
+## Restricciones
+
++ Queremos  mostrar los autores y sus libros pero solo aquellos autores que tienen entre 50 y 60 años.
+
+```
+Lo complicado de acá es que no tenemos un campo de edad, sino que tenemos la fecha de nacimiento.
+```
+
+```python
+book_collection.aggregate(
+    [ # Lista del pipeline
+     { # pipeline 1 - lookup
+      
+        "$lookup":{
+            "from": "Author",
+            "localField": "authors",
+            "foreignField": "_id",
+            "as": "autores"
+        }
+         
+     },
+     { # pipeline 2 - set edad
+      
+      "$set":{
+          "autores":{
+              "$map":{
+                  "input": "$autores",
+                  "in": {
+                      "age":{
+                          "$dateDiff":{
+                              "startDate": "$$this.date_of_birth",
+                              "endDate": "$$NOW",
+                              "unit": "year"
+                          }
+                      },
+                      "first_name":"$$this.first_name",
+                      "last_name": "$$this.last_name"
+                  }
+              }
+          }
+      }
+          
+         
+     },
+     
+     { # piplene 3 - filtrar por cierta edad
+      
+      "$match": {
+          "$and": [
+              {"autores.age": {"$gte":18}},
+              {"autores.age": {"$lte":100}}
+          ]
+      }
+         
+     },
+     {# pipeline 4 - sort by age
+      
+      "$sort":{
+          "age":1
+            }
+         
+     }
+]
+    )
+```
+
+Una vez que tenemos el agrupado en el __pipeline 1__ para saber que autores tiene cada libro junto con los datos del autor vamos a calcular la edad de cada uno de ellos en el __pipeline 2__
+En el __pipeline 2__ reemplazamos el array __autores__ creado en __pipeline 1__ con la edad, el nombre y el apellido.
+Para obtener la edad hacemos un __map__ y con __dateDiff__ obtenemos la diferencia en años entre la fecha de nacimiento y la fecha de hoy.
+En este pipeline usando el __in__ especificamos los datos que queremos que esten en el array.
+En el __pipeline 3__ hacemos un filtro con edad __minima__ 18 y __maxima__ 100 y finalmente ordenamos.
